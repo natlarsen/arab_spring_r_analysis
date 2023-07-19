@@ -1,0 +1,273 @@
+Report and Code Analyzing Arab Spring
+================
+Nat Larsen
+2023-07-05
+
+``` r
+# Load libraries
+library(readr)
+library(ggplot2)
+library(dplyr)
+```
+
+    ## 
+    ## Attaching package: 'dplyr'
+
+    ## The following objects are masked from 'package:stats':
+    ## 
+    ##     filter, lag
+
+    ## The following objects are masked from 'package:base':
+    ## 
+    ##     intersect, setdiff, setequal, union
+
+``` r
+library(tidyverse)
+```
+
+    ## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+    ## ✔ forcats   1.0.0     ✔ stringr   1.5.0
+    ## ✔ lubridate 1.9.2     ✔ tibble    3.2.1
+    ## ✔ purrr     1.0.1     ✔ tidyr     1.3.0
+
+    ## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+    ## ✖ dplyr::filter() masks stats::filter()
+    ## ✖ dplyr::lag()    masks stats::lag()
+    ## ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+
+# Topic Introduction
+
+Starting in late 2010, the Arab Spring was a series of pro-democracy
+uprisings that swept across several countries in the Middle East and
+North Africa region. It led to significant political changes, including
+the overthrow of long-standing authoritarian regimes, calls for
+democratic reforms, and social and economic upheavals.
+
+# Research Question
+
+To investigate the impact of the Arab Spring the the following years on
+public opinion, how did the attitudes towards political systems in the
+Middle East compare across countries? Did citizens prefer democracy or
+autocracy? Did democratic states have greater satisfaction with their
+government?
+
+# Description of Dataset
+
+To answer my questions about the public attitudes following the Arab
+Spring, I downloaded the Wave III data set from [Arab
+Barometer](https://www.arabbarometer.org/about/the-arab-barometer/)
+including their 2012-2014 (years directly following Arab Spring)
+questionnaire data. Arab Barometer is a research organization that
+conducts public opinion surveys across the Arab World, gaining insight
+into the social, political, and economic *attitudes* of Arab citizens.
+Rather than reflecting an objective world, public opinion data reflects
+the subjective perceptions of people-since I’m interested in citizens’
+attitudes this data will help with my question, but may limited in
+providing other insights into the Arab Spring.
+
+``` r
+# Importing Data
+ABIII_English <- read_csv("data/ABIII_English.csv") # data in `data` folder
+```
+
+    ## Warning: One or more parsing issues, call `problems()` on your data frame for details,
+    ## e.g.:
+    ##   dat <- vroom(...)
+    ##   problems(dat)
+
+    ## Rows: 14809 Columns: 296
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## chr (292): country, date, form, samp, a1, q1, q13, v13, sex, q101, q102, q10...
+    ## dbl   (4): qid, bid, wt, q1001
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+# Tidying Data
+
+Since I want to focus on the political attitudes of the public surveyed,
+I want to tidy the data so (1) each variable has its own column, (2)
+each observation has its own row, and (3) each value must has its own
+cell. To tidy my dataset, I will combine columns so variables are not. I
+also want to filter the dataset with the variables I’m interested in. In
+the original dataset, all the columns are named for the question they
+correspond to in the questionnaire code
+(<https://www.arabbarometer.org/wp-content/uploads/ABIII_Questionnaire_ENG.pdf>),
+so I should rename the columns from their question number to objects
+with more meaning.
+
+``` r
+# Examine dataset to see how to tidy
+View(ABIII_English) # looks like meet tidy criteria, but noting that values are different types (strings vs. numbers), and variables have nonsense names
+
+# Select the variables of interest
+selected_vars <- c("country", "q5171", "q5172", "q513") # choosing to include the questions about political satisfaction and preferences
+
+# Filter out missing values and subset the data to the selected variables
+filtered_data <- ABIII_English %>%
+  filter(!is.na(country), !is.na(q5171), !is.na(q5172), !is.na(q513)) %>%
+  select(all_of(selected_vars))
+
+# Rename the variables
+filtered_data <- filtered_data %>%
+  rename(
+    country = country,
+    pref_demo = q5171, # rename from question code to variable with more meaning
+    pref_auth = q5172,
+    gov_sat = q513
+  )
+
+# View the updated dataframe
+head(filtered_data)
+```
+
+    ## # A tibble: 6 × 4
+    ##   country pref_demo pref_auth  gov_sat
+    ##   <chr>   <chr>     <chr>      <chr>  
+    ## 1 Algeria Very good Good       6      
+    ## 2 Algeria Very good Very bad   5      
+    ## 3 Algeria Very good Very bad   2      
+    ## 4 Algeria Very good Don't know 6      
+    ## 5 Algeria Very good Very bad   4      
+    ## 6 Algeria Very good Very bad   7
+
+# Government Satisfaction by Country
+
+Now that my data is tidied and sorted, I first want to investigate my
+question about the political attitudes in different Middle Eastern
+countries after the Arab Spring. To do this, I am going to examine
+government satisfaction across countries by making a barchart with an
+x-axis of countries, and y-axis of % citizens responded satisfied.
+
+``` r
+# Create a new dataframe for the graph
+graph_gov_sat <- filtered_data %>%
+  group_by(country) %>%
+  summarize(pct_responses = mean(gov_sat %in% 6:10)) # defining satisfied as responses from 6-10 (indicate more government satisfaction than not)
+
+# Sort the dataframe by the percentage of responses in descending order
+graph_gov_sat <- graph_gov_sat[order(graph_gov_sat$pct_responses, decreasing = TRUE), ]
+
+# Create the bar chart
+ggplot(graph_gov_sat, aes(x = country, y = pct_responses, fill = country)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Country", y = "% Responded Satisfied", title = "Satisfaction with Government by Country (2012-2014)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_fill_discrete()
+```
+
+![](analysis_arab_spring_files/figure-gfm/government%20satisfaction-1.png)<!-- -->
+
+The above graph reveals that across the countries, no more than 50% of
+the population was satisfied with the government—suggesting that
+everywhere there was not a lot of satisfaction. However, Algeria, Iraq,
+Jordan, and Kuwait demonstrate the *most* satisfaction, while Libya,
+Lebanon, and Egypt show the *least* satisfaction. By revealing the
+countries with the most or least satisfaction, this graph helps
+visualize which countries experienced which attitude, to help us further
+investigate reasons why—could there be similarities between the
+countries with most/least satisfaction?
+
+# % Citizens Favoring Democracy by Country
+
+To further investigate public attitudes towards political institutions,
+I want to see what percentage of citizens favor democracy or
+authoritarianism by plotting countries and the % favor
+democracy/authoritarianism.
+
+``` r
+# Define the columns of interest
+columns <- c("pref_demo", "pref_auth")
+
+# Create an empty list to store the results
+results <- list()
+
+# Use a for loop to iterate over the columns
+for (col in columns) {
+  # since both the pref_demo and pref_auth columns use the same criteria to evaluate if citizens         prefer those governments, I can use for loop to manipulate both columns in the same way
+  result <- filtered_data %>%
+    group_by(country) %>%
+    summarize(pct_responses = mean(.data[[col]] %in% c("Very good", "Good"))) # find percentage of "Very good" and "Good" responses for each country
+  col_name <- paste0("pct_favor_", col) # rename to represent the specific column processed
+  colnames(result)[2] <- col_name
+  results[[col]] <- result # add the result to the list
+}
+
+# Combine the results into a single dataframe to graph
+graph_pref <- Reduce(function(x, y) merge(x, y, by = "country", all = TRUE), results)
+
+# Create the bar chart
+ggplot(graph_pref) +
+  geom_bar(aes(x = country, y = pct_favor_pref_demo, fill = "Democracy"), stat = "identity", width = 0.5) +
+  geom_bar(aes(x = country, y = pct_favor_pref_auth, fill = "Authoritarian"), stat = "identity", width = 0.5) +
+  labs(x = "Country", y = "% Responses", title = "Preference for Democracy vs. Authoritarianism (2012-2014)") +
+  scale_fill_manual(values = c(Democracy = "blue", Authoritarian = "red"), guide = "none") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+![](analysis_arab_spring_files/figure-gfm/preference%20demo/auth-1.png)<!-- -->
+
+The above graph shows that across the dataset, all countries have
+greater preference for democracy (blue) than authoritarianism (red).
+Algeria, Lebanon, Iraq, and Egypt seem to all have a greater preference
+for democracy than other countries while Kuwait, Jordan, and Yemen have
+a greater preference for authoritarianism than other countries. This is
+an interesting comparison to the graph about government
+satisfaction—countries may both prefer democracy yet have different
+levels of government satisfaction (Algeria vs. Egypt). This sparks
+another question-is there any correlation between government
+satisfaction and preference for democracy?
+
+# Government Satisfcation and Democratic Preference
+
+To answer my question building on government satisfaction and democratic
+preference, I am going to merge the data frames to make a graph plotting
+government satisfaction against democratic preference.
+
+``` r
+# Merge graph_gov_sat and graph_pref dataframes
+graph_sat_pref <- merge(graph_gov_sat, graph_pref, by = "country", all = TRUE)
+
+# Create the scatter plot
+ggplot(graph_sat_pref, aes(x = pct_responses, y = pct_favor_pref_demo)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) + # line of best fit
+  labs(x = "Government Satisfaction", y = "% Favoring Democracy", title = "Government Satisfaction and Preference for Democracy (2012-2014)") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+    ## `geom_smooth()` using formula = 'y ~ x'
+
+![](analysis_arab_spring_files/figure-gfm/satisfaction%20and%20democratic%20preference-1.png)<!-- -->
+
+The above graph shows that there is some correlation between government
+satisfaction and % citizens favoring democracy—higher government
+satisfaction correlates with higher democratic preference. Perhaps in
+the wake of the Arab Spring and calls for democracy, people felt more
+satisfied with their governments if they preferred democracy.
+
+# Summary
+
+This investigation-from finding government satisfaction, to democratic
+preference, to comparing these two variables against each other-sheds
+interesting light into the public opinions following the Arab Spring.
+Overall, I discovered that, at most, half the population was satisfied
+with the government, meaning that even following the Arab Spring and
+political changes, government dissatisfaction remained high. However,
+there remained a large preference for democracy across the Arab World,
+and those who preferred democracy were more likely to be more satisfied
+with the government. This suggests that there may be a link between
+democracy and government satisfaction-or perhaps just a change in
+political system with government satisfaction.
+
+While this project sheds light on possible trends between countries,
+government satisfaction, and democracy, to fully answer my research
+questions requires further investigation into why citizens might be
+unsatisfied with their government and what trends between countries may
+have informed this. I would be interested in advancing these findings
+through further research with different datasets extending beyond public
+opinion and perhaps incorporating information such as country democratic
+status and GDP. It would also be interesting to compare these findings
+over time, using the other data Arab Barometer generated in later years.
+Thank you for reading!
